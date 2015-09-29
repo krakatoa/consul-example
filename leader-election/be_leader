@@ -1,0 +1,49 @@
+#!/usr/bin/python
+
+import json
+
+import socket
+import fcntl
+import struct
+
+import httplib, urllib
+
+def get_ip_address(ifname):
+  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  return socket.inet_ntoa(fcntl.ioctl(
+      s.fileno(),
+      0x8915,  # SIOCGIFADDR
+      struct.pack('256s', ifname[:15])
+  )[20:24])
+
+def create_session():
+  conn = httplib.HTTPConnection('{}:8500'.format(ip))
+
+  headers = {"Content-Type": "application/json"}
+  conn.request("PUT", "/v1/session/create", '{"LockDelay":"10s","Name":"sp-region-lock","Checks":["serfHealth"],"Behavior":"release","TTL":"3600s"}')
+  # conn.request("PUT", "/v1/session/create", '{"LockDelay":"10s","Name":"sp-region-lock","Checks":["serfHealth","service:web"],"Behavior":"release","TTL":"3600s"}')
+  res = conn.getresponse()
+
+  data = res.read()
+  kv = json.loads(data)
+  return kv['ID']
+
+def acquire_lock(session_id):
+  conn = httplib.HTTPConnection('{}:8500'.format(ip))
+
+  conn.request("PUT", "/v1/kv/service/web/leader?acquire={}".format(session_id))
+  res = conn.getresponse()
+
+  data = res.read()
+  acquired = json.loads(data) # Boolean
+
+  return acquired
+
+ip = get_ip_address('eth1')
+
+session_id = create_session()
+
+if acquire_lock(session_id):
+  print "Successfully became Leader"
+else:
+  print "Failed to become Leader"

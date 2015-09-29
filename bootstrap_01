@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./consul agent -advertise 192.168.71.11 -bind 192.168.71.11 -server -bootstrap-expect 1 -data-dir /tmp/consul -client 192.168.71.11 -config-dir ./checks/$1

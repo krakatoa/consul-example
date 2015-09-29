@@ -1,0 +1,45 @@
+#!/usr/bin/python
+
+import json
+
+import socket
+import fcntl
+import struct
+
+import httplib
+
+def get_ip_address(ifname):
+  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  return socket.inet_ntoa(fcntl.ioctl(
+      s.fileno(),
+      0x8915,  # SIOCGIFADDR
+      struct.pack('256s', ifname[:15])
+  )[20:24])
+
+def get_session_info(session):
+  conn = httplib.HTTPConnection('{}:8500'.format(ip))
+  conn.request("GET", "/v1/session/info/{}".format(session))
+  res = conn.getresponse()
+
+# [{"CreateIndex":296,"ID":"9a8ced8e-09ac-8cdf-415a-ff483d37e2dc","Name":"sp-region-lock","Node":"fsk-03","Checks":["serfHealth","service:web"],"LockDelay":15000000000,"Behavior":"release","TTL":"3600s"}]
+
+  data = res.read()
+  kv = json.loads(data)[0]
+
+  if 'Node' in kv:
+    return kv['Node']
+
+ip = get_ip_address('eth1')
+
+conn = httplib.HTTPConnection('{}:8500'.format(ip))
+conn.request("GET", "/v1/kv/service/web/leader")
+res = conn.getresponse()
+
+data = res.read()
+kv = json.loads(data)[0]
+
+if 'Session' in kv:
+  leader = get_session_info(kv['Session'])
+  print "Leader: {}".format(leader)
+else:
+  print "No Leader"

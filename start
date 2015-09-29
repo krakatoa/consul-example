@@ -1,0 +1,5 @@
+#!/bin/bash
+
+IP=$(/sbin/ifconfig eth1 | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}')
+
+./consul agent -advertise $IP -bind $IP -server -data-dir /tmp/consul -client $IP -join $1 -config-dir ./checks/$2 &
